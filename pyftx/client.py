@@ -94,11 +94,49 @@ class Client(BaseClient):
         if self.subaccount is not None:
             request.headers['FTX-SUBACCOUNT'] = urllib.parse.quote(self.subaccount)
 
+    def place_order(self, **kwargs) -> Dict:
+        try:
+            return self._post("/orders", params=kwargs)
+        except:
+            time.sleep(0.2)
+            return self._post("/orders", params=kwargs)
+
+    def place_conditional_order(self, **kwargs) -> Dict:
+        try:
+            return self._post("/conditional_orders", params=kwargs)
+        except:
+            time.sleep(0.2)
+            return self._post("/conditional_orders", params=kwargs)
+
+    def modify_order(self, order_id, **kwargs) -> Dict:
+        ftx_endpoint = f"/orders/{order_id}/modify"
+        try:
+            return self._post(ftx_endpoint, params=kwargs)
+        except:
+            time.sleep(0.2)
+            return self._post(ftx_endpoint, params=kwargs)
+
+    def cancel_order(self, order_id):
+        ftx_endpoint = f"/orders/{order_id}"
+        try:
+            return self._delete(ftx_endpoint)
+        except:
+            time.sleep(0.2)
+            return self._delete(ftx_endpoint)
+
+    def cancel_orders(self, **kwargs):
+        ftx_endpoint = f"/orders"
+        try:
+            return self._delete(ftx_endpoint, kwargs)
+        except:
+            time.sleep(0.2)
+            return self._delete(ftx_endpoint, kwargs)
+
+    def set_leverage(self, **kwargs):
+        return self._post("/account/leverage", kwargs)
+
     def get_markets(self) -> Dict:
         return self._get("/markets")
-
-    def get_funding_rate(self, **kwargs) -> Dict:
-        return self._get("/funding_rates", params=kwargs)
 
     def get_klines(self, market: str, resolution: int, start_time=None, end_time=None) -> Dict:
         params = {}
@@ -121,43 +159,38 @@ class Client(BaseClient):
 
     def get_positions(self, **kwargs) -> Dict:
         return self._get("/positions", params=kwargs)
-
-    def place_order(self, **kwargs) -> Dict:
-        try:
-            return self._post("/orders", params=kwargs)
-        except:
-            time.sleep(0.2)
-            return self._post("/orders", params=kwargs)
-
-    def place_conditional_order(self, **kwargs) -> Dict:
-        try:
-            return self._post("/conditional_orders", params=kwargs)
-        except:
-            time.sleep(0.2)
-            return self._post("/conditional_orders", params=kwargs)
-
-    def set_leverage(self, **kwargs):
-        return self._post("/account/leverage", kwargs)
-
-    def request_withdrawal(self, **kwargs):
-        return self._post("/wallet/withdrawals", kwargs)
-
-    def cancel_order(self, order_id):
-        return self._delete(f"/orders/{order_id}")
-
-    def cancel_orders(self, **kwargs):
-        return self._delete(f"/orders", kwargs)
-
     def get_open_orders(self) -> Dict:
         return self._get("/orders")
 
     def get_history_orders(self) -> Dict:
-        return self._get("/orders/history")
+        return self._get("/orders/-")
 
     def get_leverage_tokens(self) -> Dict:
         return self._get("/lt/tokens")
 
+    def get_funding_payments(self) -> Dict:
+        return self._get("/funding_payments")
 
+    def get_funding_rate(self, **kwargs) -> Dict:
+        return self._get("/funding_rates", params=kwargs)
+
+    def get_all_subaccounts(self) -> Dict:
+        return self._get("/subaccounts")
+    def get_saved_addresses(self, **kwargs) -> Dict:
+        return self._get("/wallet/saved_addresses", params=kwargs)
+
+    def get_deposit_history(self, **kwargs) -> Dict:
+        return self._get("/wallet/deposits", params=kwargs)
+
+    def get_deposit_address(self, coin, **kwargs) -> Dict:
+        ftx_endpoint = f"/wallet/deposit_address/{coin}"
+        return self._get(ftx_endpoint, params=kwargs)
+
+    def get_withdrawal_history(self, **kwargs) -> Dict:
+        return self._get("/wallet/withdrawals", params=kwargs)
+
+    def request_withdrawal(self, **kwargs):
+        return self._post("/wallet/withdrawals", kwargs)
 class AsyncClient(BaseClient):
     def __init__(
             self,

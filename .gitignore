@@ -2,8 +2,6 @@ setup.py
 setup.cfg
 Pipfile
 Makefile
-LICENSE
-release_notes.md
 # Created by https://www.toptal.com/developers/gitignore/api/python,virtualenv,visualstudio,visualstudiocode,linux
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,virtualenv,visualstudio,visualstudiocode,linux
 
@@ -50,7 +48,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
+zzz*
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -574,3 +572,5 @@ FodyWeavers.xsd
 # Additional files built by Visual Studio
 
 # End of https://www.toptal.com/developers/gitignore/api/python,virtualenv,visualstudio,visualstudiocode,linux
+/FocusMatrix_ftx.md
+/.pypirc
