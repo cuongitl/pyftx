@@ -1,5 +1,6 @@
 # Python FTX API Sample Code
-===============================
+
+
 [![License](https://img.shields.io/badge/license-MIT-green)](https://pypi.org/project/python-ftx-api/LICENSE)
 [![python-ftx-api Version](https://img.shields.io/pypi/v/python-ftx-api?logo=pypi)](https://pypi.org/project/python-ftx-api/)
 [![python-ftx-api Python Versions](https://img.shields.io/pypi/pyversions/python-ftx-api?logo=pypi)](https://pypi.org/project/python-ftx-api/)
