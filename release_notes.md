@@ -19,3 +19,6 @@
     * [x] get_saved_addresses
     * [x] get_withdrawal_history
     * [x] get_all_subaccounts
+* Version 0.0.4 - 29 May 2022 fixed bug
+* Version 0.0.5 - 31 May 2022
+  * Add a lot of endpoint from ftx's documents

@@ -1,7 +1,7 @@
 # Python FTX API Sample Code
 
 
-[![License](https://img.shields.io/badge/license-MIT-green)](https://pypi.org/project/python-ftx-api/LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green)](https://gitlab.com/cuongitl/python-ftx-api/-/blob/main/LICENSE)
 [![python-ftx-api Version](https://img.shields.io/pypi/v/python-ftx-api?logo=pypi)](https://pypi.org/project/python-ftx-api/)
 [![python-ftx-api Python Versions](https://img.shields.io/pypi/pyversions/python-ftx-api?logo=pypi)](https://pypi.org/project/python-ftx-api/)
 [![python-ftx-api Downloads Per Day](https://img.shields.io/pypi/dd/python-ftx-api?logo=pypi)](https://pypi.org/project/python-ftx-api/)
@@ -16,7 +16,7 @@ I am in no way affiliated with FTX, use at your own risk.
 **If you think something is broken, something is missing or have any questions, please open an [Issue](https://gitlab.com/cuongitl/python-ftx-api/-/issues)**
 
 # Get Started and Documentation
-If you’re new to FTX, use the following link to [save 5% on all of your trade fees.](https://ftx.com/referrals#a=121465957)
+If you're new to FTX, use the following link to [save 5% on all of your trade fees.](https://ftx.com/referrals#a=121465957)
 * [Register an account with FTX.](https://ftx.com/referrals#a=121465957)
 * [Generate an API Key and assign relevant permissions.](https://ftx.com/profile)
 * [FTX API docs](https://docs.ftx.com/#overview)
@@ -45,11 +45,6 @@ print(info)
 
 ```python
 from pyftx import ThreadedWebsocketManager
-
-
-def on_message(event, argument):
-    msg = "{}.event: {}".format(argument, event)
-    print("on message: ", msg)
 
 
 def on_read(event):
@@ -90,9 +85,19 @@ wsm.subscribe(
 ```
 ### Websocket with arguments
 
-
 ```python
+from pyftx import ThreadedWebsocketManager
 from functools import partial
+
+API = "your-api-key"
+SECRET = "your-secret-key"
+subaccount_name = "your-subaccount_name"
+
+def on_message(event, argument):
+    msg = "{}.event: {}".format(argument, event)
+    print("on message: ", msg)
+wsm = ThreadedWebsocketManager(API, SECRET, subaccount=subaccount_name)
+wsm.start()
 # Un-auth subscribe - Public Channels
 subaccount_name = "Cuongitl"
 callback_with_arguments = partial(on_message, argument=subaccount_name)
@@ -110,6 +115,9 @@ I develop and maintain this package on my own for free in my spare time. Donatio
 * **USDT**:  `0x329a9F2b01aDA25F15eAE4C633d3bed8442c7BC6`  (BSC)
 
 * **FTT**:  `0x329a9F2b01aDA25F15eAE4C633d3bed8442c7BC6`  (ERC-20)
+
+## Communities
+* [Telegram 🐍 Python FTX API](https://t.me/ftx_api)
 
 ## Release Notes
 The release notes can be found

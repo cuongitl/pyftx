@@ -3,11 +3,18 @@ import aiohttp
 import asyncio
 import requests
 from loguru import logger
-from pyftx import FtxAPIException, FtxValueError
+from pyftx import FtxAPIException, FtxValueError, enums
 from typing import Dict, Optional, Any
 from requests import Request
 import hmac
 import urllib.parse
+
+ENDPOINT_ORDERS = "/orders"
+ENDPOINT_ORDERS_HISTORY = "{}/history".format(ENDPOINT_ORDERS)
+ENDPOINT_ORDERS_CLIENTID = "{}/by_client_id".format(ENDPOINT_ORDERS)
+ENDPOINT_ORDERS_TRIGGER = "/conditional_orders"
+ENDPOINT_ORDERS_TRIGGER_HISTORY = "{}/history".format(ENDPOINT_ORDERS_TRIGGER)
+ENDPOINT_WALLET = "/wallet"
 
 
 class BaseClient:
@@ -94,30 +101,86 @@ class Client(BaseClient):
         if self.subaccount is not None:
             request.headers['FTX-SUBACCOUNT'] = urllib.parse.quote(self.subaccount)
 
+    """ Orders Zone"""
+
+    def get_open_orders(self, **kwargs) -> Dict:
+        return self._get(ENDPOINT_ORDERS, params=kwargs)
+
+    def get_orders_history(self, **kwargs) -> Dict:
+        return self._get(ENDPOINT_ORDERS_HISTORY, params=kwargs)
+
+    def get_conditional_orders(self, **kwargs) -> Dict:
+        return self._get(ENDPOINT_ORDERS_TRIGGER, params=kwargs)
+
+    def get_conditional_orders_triggers(self, **kwargs) -> Dict:
+        ftx_endpoint = f"{ENDPOINT_ORDERS_TRIGGER}/{conditional_order_id}/triggers"
+        return self._get(ftx_endpoint, params=kwargs)
+
+    def get_conditional_order_history(self, **kwargs) -> Dict:
+        return self._get(ENDPOINT_ORDERS_TRIGGER_HISTORY, params=kwargs)
+
     def place_order(self, **kwargs) -> Dict:
         try:
-            return self._post("/orders", params=kwargs)
+            return self._post(ENDPOINT_ORDERS, params=kwargs)
         except:
             time.sleep(0.2)
-            return self._post("/orders", params=kwargs)
+            return self._post(ENDPOINT_ORDERS, params=kwargs)
 
     def place_conditional_order(self, **kwargs) -> Dict:
         try:
-            return self._post("/conditional_orders", params=kwargs)
+            return self._post(ENDPOINT_ORDERS_TRIGGER, params=kwargs)
         except:
             time.sleep(0.2)
-            return self._post("/conditional_orders", params=kwargs)
+            return self._post(ENDPOINT_ORDERS_TRIGGER, params=kwargs)
 
     def modify_order(self, order_id, **kwargs) -> Dict:
-        ftx_endpoint = f"/orders/{order_id}/modify"
+        ftx_endpoint = f"{ENDPOINT_ORDERS}/{order_id}/modify"
         try:
             return self._post(ftx_endpoint, params=kwargs)
         except:
             time.sleep(0.2)
             return self._post(ftx_endpoint, params=kwargs)
 
+    def modify_order_by_clientid(self, client_order_id, **kwargs) -> Dict:
+        ftx_endpoint = f"{ENDPOINT_ORDERS}/by_client_id/{client_order_id}/modify"
+        try:
+            return self._post(ftx_endpoint, params=kwargs)
+        except:
+            time.sleep(0.2)
+            return self._post(ftx_endpoint, params=kwargs)
+
+    def modify_conditional_orders(self, order_id, **kwargs) -> Dict:
+        ftx_endpoint = f"{ENDPOINT_ORDERS_TRIGGER}/{order_id}/modify"
+        try:
+            return self._post(ftx_endpoint, params=kwargs)
+        except:
+            time.sleep(0.2)
+            return self._post(ftx_endpoint, params=kwargs)
+
+    def get_order_status(self, order_id):
+        return self._get(f"{ENDPOINT_ORDERS}/{order_id}")
+
+    def get_order_status_by_clientid(self, client_order_id):
+        return self._get(f"{ENDPOINT_ORDERS}/by_client_id/{client_order_id}")
+
     def cancel_order(self, order_id):
-        ftx_endpoint = f"/orders/{order_id}"
+        ftx_endpoint = f"{ENDPOINT_ORDERS}/{order_id}"
+        try:
+            return self._delete(ftx_endpoint)
+        except:
+            time.sleep(0.2)
+            return self._delete(ftx_endpoint)
+
+    def cancel_order_by_clientid(self, client_order_id):
+        ftx_endpoint = f"{ENDPOINT_ORDERS}/by_client_id/{client_order_id}"
+        try:
+            return self._delete(ftx_endpoint)
+        except:
+            time.sleep(0.2)
+            return self._delete(ftx_endpoint)
+
+    def cancel_conditional_orders(self, id):
+        ftx_endpoint = f"{ENDPOINT_ORDERS_TRIGGER}/{id}"
         try:
             return self._delete(ftx_endpoint)
         except:
@@ -125,7 +188,7 @@ class Client(BaseClient):
             return self._delete(ftx_endpoint)
 
     def cancel_orders(self, **kwargs):
-        ftx_endpoint = f"/orders"
+        ftx_endpoint = f"{ENDPOINT_ORDERS}"
         try:
             return self._delete(ftx_endpoint, kwargs)
         except:
@@ -152,18 +215,16 @@ class Client(BaseClient):
         return self._get("/account")
 
     def get_all_balances(self) -> Dict:
-        return self._get("/wallet/all_balances")
+        return self._get("{}/all_balances".format(ENDPOINT_WALLET))
 
     def get_balances(self) -> Dict:
-        return self._get("/wallet/balances")
+        return self._get("{}/balances".format(ENDPOINT_WALLET))
 
     def get_positions(self, **kwargs) -> Dict:
         return self._get("/positions", params=kwargs)
-    def get_open_orders(self) -> Dict:
-        return self._get("/orders")
 
-    def get_history_orders(self) -> Dict:
-        return self._get("/orders/-")
+    def get_all_positions(self, **kwargs) -> Dict:
+        return self._get("/all_positions", params=kwargs)
 
     def get_leverage_tokens(self) -> Dict:
         return self._get("/lt/tokens")
@@ -176,21 +237,24 @@ class Client(BaseClient):
 
     def get_all_subaccounts(self) -> Dict:
         return self._get("/subaccounts")
+
     def get_saved_addresses(self, **kwargs) -> Dict:
-        return self._get("/wallet/saved_addresses", params=kwargs)
+        return self._get("{}/saved_addresses".format(ENDPOINT_WALLET), params=kwargs)
 
     def get_deposit_history(self, **kwargs) -> Dict:
-        return self._get("/wallet/deposits", params=kwargs)
+        return self._get("{}/deposits".format(ENDPOINT_WALLET), params=kwargs)
 
     def get_deposit_address(self, coin, **kwargs) -> Dict:
-        ftx_endpoint = f"/wallet/deposit_address/{coin}"
+        ftx_endpoint = f"{ENDPOINT_WALLET}/deposit_address/{coin}"
         return self._get(ftx_endpoint, params=kwargs)
 
     def get_withdrawal_history(self, **kwargs) -> Dict:
-        return self._get("/wallet/withdrawals", params=kwargs)
+        return self._get("{}/withdrawals".format(ENDPOINT_WALLET), params=kwargs)
 
     def request_withdrawal(self, **kwargs):
-        return self._post("/wallet/withdrawals", kwargs)
+        return self._post("{}/withdrawals".format(ENDPOINT_WALLET), kwargs)
+
+
 class AsyncClient(BaseClient):
     def __init__(
             self,
