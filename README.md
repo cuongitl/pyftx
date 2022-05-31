@@ -117,7 +117,7 @@ I develop and maintain this package on my own for free in my spare time. Donatio
 * **FTT**:  `0x329a9F2b01aDA25F15eAE4C633d3bed8442c7BC6`  (ERC-20)
 
 ## Communities
-* [Telegram 🐍 Python FTX API](https://t.me/ftx_api)
+* Telegram: [Python FTX API](https://t.me/ftx_api)
 
 ## Release Notes
 The release notes can be found
