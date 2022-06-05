@@ -14,7 +14,6 @@ import websockets as ws
 from pyftx import AsyncClient
 from pyftx import ws_signature
 from .threaded_stream import ThreadedApiManager
-import socket
 
 KEEPALIVE_TIMEOUT = 5 * 60  # 5 minutes
 
@@ -29,8 +28,8 @@ class WSListenerState(Enum):
 class ReconnectingWebsocket:
     MAX_RECONNECTS = 5
     MAX_RECONNECT_SECONDS = 60
-    MIN_RECONNECT_WAIT = 0.1
-    TIMEOUT = 10
+    MIN_RECONNECT_WAIT = 0.2
+    TIMEOUT = 15
     NO_MESSAGE_RECONNECT_TIMEOUT = 60
     MAX_QUEUE_SIZE = 10000
 
@@ -42,7 +41,11 @@ class ReconnectingWebsocket:
             name: Optional[str] = None,
             is_binary: bool = False,
             exit_coro=None,
+            debug=False,
+            username: str = "",
     ):
+        self.debug = debug
+        self.username = username
         self._loop = loop or asyncio.get_event_loop()
         self._name = name
         self._url = url
@@ -55,10 +58,6 @@ class ReconnectingWebsocket:
         self._queue = asyncio.Queue(loop=self._loop)
         self._handle_read_loop = None
         self.subscription = subscription
-        # set some default values
-        self.sleep_time = 0.1
-        self.reply_timeout = 10
-        self.ping_timeout = 5
 
     async def __aenter__(self):
         await self.connect()
@@ -122,28 +121,36 @@ class ReconnectingWebsocket:
 
     async def _read_loop(self):
         while True:
+            self._handle_read_loop = None
+            self._reconnects = 0
             # outer loop restarted every time the connection fails
-            logger.debug('Creating new connection...')
+            if self.debug:
+                logger.debug("{}..creating new connection...".format(self.username))
             try:
                 while True:
                     # listener loop
                     try:
                         if self.ws_state == WSListenerState.RECONNECTING:
-                            logger.warning("ws.protocol.State.RECONNECTING.")
+                            if self.debug:
+                                logger.warning("{}..ws.protocol.State.RECONNECTING.".format(self.username))
                             await self._run_reconnect()
                         if not self.ws or self.ws_state != WSListenerState.STREAMING:
-                            logger.warning("ws.protocol.State.STREAMING.")
+                            if self.debug:
+                                logger.debug("{}..ws.protocol.State.STREAMING.".format(self.username))
                             await self._wait_for_reconnect()
                             break
                         elif self.ws_state == WSListenerState.EXITING:
-                            logger.warning("ws.protocol.State.EXITING.")
+                            if self.debug:
+                                logger.warning("{}..ws.protocol.State.EXITING.".format(self.username))
                             break
-                        elif self.ws.state == ws.protocol.State.CLOSING:
-                            logger.warning("ws.protocol.State.CLOSING.")
+                        elif self.ws.state == ws.protocol.State.CLOSING:  # type: ignore
+                            if self.debug:
+                                logger.warning("{}..ws.protocol.State.CLOSING.".format(self.username))
                             await asyncio.sleep(0.1)
                             continue
                         elif self.ws.state == ws.protocol.State.CLOSED:
-                            logger.error("ws.protocol.State.CLOSED. _reconnect")
+                            if self.debug:
+                                logger.error("{}..ws.protocol.State.CLOSED. _reconnect".format(self.username))
                             await self._reconnect()
                         elif self.ws_state == WSListenerState.STREAMING:
                             try:
@@ -153,22 +160,29 @@ class ReconnectingWebsocket:
                                     if self._queue.qsize() < self.MAX_QUEUE_SIZE:
                                         await self._queue.put(res)
                                     else:
-                                        logger.debug(f"Queue overflow {self.MAX_QUEUE_SIZE}. Message not filled")
+                                        if self.debug:
+                                            logger.debug(f"Queue overflow {self.MAX_QUEUE_SIZE}. Message not filled")
                                         await self._queue.put({"e": "error", "m": "Queue overflow. Message not filled"})
                                         raise FtxWebsocketUnableToConnect
                             except (asyncio.TimeoutError, ConnectionClosed):
                                 try:
-                                    pong = await ws.ping()
-                                    await asyncio.wait_for(pong, timeout=self.ping_timeout)
-                                    logger.debug('Ping OK, keeping connection alive...')
+                                    pong = await self.ws.ping()
+                                    await asyncio.wait_for(pong, timeout=self.TIMEOUT)
                                     continue
                                 except:
-                                    logger.debug(
-                                        'Ping error - retrying connection in {} sec (Ctrl-C to quit)'.format(self.sleep_time))
-                                    await asyncio.sleep(self.sleep_time)
+                                    logger.debug("{}..Ping error - retrying connection in {} sec (Ctrl-C to quit)".format(self.MIN_RECONNECT_WAIT, self.username))
+                                    await asyncio.sleep(self.MIN_RECONNECT_WAIT)
                                     break
-                    except asyncio.TimeoutError:
+                    except (asyncio.TimeoutError, ConnectionClosed):
                         logger.debug(f"no message in {self.TIMEOUT} seconds")
+                        try:
+                            pong = await self.ws.ping()
+                            await asyncio.wait_for(pong, timeout=self.TIMEOUT)
+                            continue
+                        except:
+                            logger.debug("Ping error - retrying connection in {} sec (Ctrl-C to quit)".format(self.MIN_RECONNECT_WAIT))
+                            await asyncio.sleep(self.MIN_RECONNECT_WAIT)
+                            break
                     except asyncio.CancelledError as e:
                         logger.debug(f"cancelled error {e}")
                         break
@@ -184,25 +198,30 @@ class ReconnectingWebsocket:
                     except Exception as e:
                         logger.debug(f"Unknown exception ({e})")
                         continue
-            except socket.gaierror:
+            except gaierror:
                 logger.debug(
-                    'Socket error - retrying connection in {} sec (Ctrl-C to quit)'.format(self.sleep_time))
-                await asyncio.sleep(self.sleep_time)
+                    'Socket error - retrying connection in {} sec (Ctrl-C to quit)'.format(self.MIN_RECONNECT_WAIT))
+                await asyncio.sleep(self.MIN_RECONNECT_WAIT)
                 continue
             except ConnectionRefusedError:
                 logger.debug('Nobody seems to listen to this endpoint. Please check the URL.')
-                logger.debug('Retrying connection in {} sec (Ctrl-C to quit)'.format(self.sleep_time))
-                await asyncio.sleep(self.sleep_time)
+                logger.debug('Retrying connection in {} sec (Ctrl-C to quit)'.format(self.MIN_RECONNECT_WAIT))
+                await asyncio.sleep(self.MIN_RECONNECT_WAIT)
                 continue
-            # finally:
-            #     self._handle_read_loop = None
-            #     self._reconnects = 0
+            finally:
+                self._handle_read_loop = None
+                self._reconnects = 0
+            await asyncio.sleep(5)
 
     async def _after_reconnect(self):
         for msg in self.subscription:
             await self.send_msg(msg)
 
     async def _run_reconnect(self):
+        reconnects_left = self.MAX_RECONNECTS - self._reconnects
+        if reconnects_left >= self.MAX_RECONNECTS - 1:
+            # send warning
+            await self._queue.put({"e": "error", "m": "1006.Websocket is disconnected and is unable to reconnect. Suggest:force close and start program again."})
         await self.before_reconnect()
         if self._reconnects < self.MAX_RECONNECTS:
             reconnect_wait = self._get_reconnect_wait(self._reconnects)
@@ -216,7 +235,7 @@ class ReconnectingWebsocket:
         else:
             logger.error(f"Max reconnections {self.MAX_RECONNECTS} reached:")
             # Signal the error
-            await self._queue.put({"e": "error", "m": "Max reconnect retries reached"})
+            await self._queue.put({"e": "error", "m": "1006.Max reconnect retries reached"})
             raise FtxWebsocketUnableToConnect
 
     async def recv(self):
@@ -251,31 +270,34 @@ class ReconnectingWebsocket:
 
 
 class FtxSocketManager:
-    WS_URL = "wss://ftx.com/ws/"
+    STREAM_URL = "wss://ftx.{}/ws/"
 
     def __init__(
             self,
             client: AsyncClient,
             loop=None,
+            debug=False,
+            username: str = "",
     ):
         self._conns = {}
         self._loop = loop or asyncio.get_event_loop()
         self._client = client
         self.subscription = []
-
-    def _init_stream_url(self):
-        self.ws_url = self.STREAM_URL
-        self.private_ws_url = self.PSTREAM_URL
+        self.debug = debug
+        self.username = username
+        self.STREAM_URL = self.STREAM_URL.format(client.tld)
 
     def _get_socket(self, socket_name: str, is_binary: bool = False) -> str:
         if socket_name not in self._conns:
             self._conns[socket_name] = ReconnectingWebsocket(
                 loop=self._loop,
                 name=socket_name,
-                url=self.WS_URL,
+                url=self.STREAM_URL,
                 exit_coro=self._exit_socket,
                 is_binary=is_binary,
                 subscription=self.subscription,
+                debug=self.debug,
+                username=self.username
             )
 
         return self._conns[socket_name]
@@ -307,16 +329,20 @@ class ThreadedWebsocketManager(ThreadedApiManager):
             api_key: Optional[str] = None,
             api_secret: Optional[str] = None,
             subaccount: str = None,
+            debug: bool = False,
+            username: str = "",
     ):
         super().__init__(api_key, api_secret)
         self._fsm: Optional[FtxSocketManager] = None
         self.api = api_key
         self.secret = api_secret
         self.subaccount = subaccount
+        self.debug = debug
+        self.username = username
 
     async def _before_socket_listener_start(self):
         assert self._client
-        self._fsm = FtxSocketManager(client=self._client, loop=self._loop)
+        self._fsm = FtxSocketManager(client=self._client, loop=self._loop, debug=self.debug, username=self.username)
 
     def _start_socket(
             self,
@@ -331,7 +357,7 @@ class ThreadedWebsocketManager(ThreadedApiManager):
         self._socket_running[name] = True
         self._loop.call_soon_threadsafe(
             asyncio.create_task,
-            self.start_listener(socket, socket._name, callback, self.ping),
+            self.start_listener(socket, name, callback, self.ping),
         )
 
         return socket
@@ -346,6 +372,10 @@ class ThreadedWebsocketManager(ThreadedApiManager):
             socket_name=socket_name,
         )
         self.ping(socket_name)
+        # return self._start_socket(
+        #     callback=callback,
+        #     socket_name=socket_name,
+        # )
         return socket
 
     def subscribe(self, socket_name: str, **params):
@@ -365,11 +395,10 @@ class ThreadedWebsocketManager(ThreadedApiManager):
             return
         ts = int(time.time() * 1000)
         sign = ws_signature(ts, self.secret)
-        args = {}
-        args["key"] = self.api
-        args["sign"] = sign
-        args["time"] = ts
-        if self.subaccount != None:
+        args = {"key": self.api,
+                "sign": sign,
+                "time": ts}
+        if self.subaccount is not None:
             args["subaccount"] = self.subaccount
 
         self.subscribe(socket_name=socket_name, args=args, op="login")

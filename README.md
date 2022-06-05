@@ -11,6 +11,8 @@
 [FTX](https://ftx.com/referrals#a=121465957) is a cryptocurrency derivatives exchange.
 
 This is a wrapper around the FTX API as described on [FTX](https://docs.ftx.com/), including all features the API provides using clear and readable objects, both for the REST  as the websocket API.
+> An unofficial Python3 library to interact with [FTX.COM](https://ftx.com/) and [FTX.US](https://ftx.us).
+ 
 I am in no way affiliated with FTX, use at your own risk.
 
 **If you think something is broken, something is missing or have any questions, please open an [Issue](https://gitlab.com/cuongitl/python-ftx-api/-/issues)**
@@ -26,6 +28,8 @@ If you're new to FTX, use the following link to [save 5% on all of your trade fe
 # Install
     pip install python-ftx-api
 # Usage
+> If you are using an exchange from the US, or other TLD then make sure pass tld='us' when creating the client. Default tld='com'
+
 > Change your API KEY and your SECRET KEY.
 ### Restful Api Sample Code 
 

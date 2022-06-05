@@ -2,13 +2,13 @@ import asyncio
 import threading
 from typing import Callable, Optional, Dict
 from pyftx import AsyncClient
-from loguru import logger
+
 
 class ThreadedApiManager(threading.Thread):
     def __init__(
-        self,
-        api_key: Optional[str] = None,
-        api_secret: Optional[str] = None,
+            self,
+            api_key: Optional[str] = None,
+            api_secret: Optional[str] = None,
     ):
         """Initialise the FtxSocketManager"""
         super().__init__()

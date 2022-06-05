@@ -16,32 +16,40 @@ ENDPOINT_ORDERS_TRIGGER = "/conditional_orders"
 ENDPOINT_ORDERS_TRIGGER_HISTORY = "{}/history".format(ENDPOINT_ORDERS_TRIGGER)
 ENDPOINT_WALLET = "/wallet"
 
+HEADERS_KEY = "FTX-KEY"
+HEADERS_SIGN = "FTX-SIGN"
+HEADERS_TS = "FTX-TS"
+HEADERS_SUBACCOUNT = "FTX-SUBACCOUNT"
+
+HEADERS_KEY_US = "FTXUS-KEY"
+HEADERS_SIGN_US = "FTXUS-SIGN"
+HEADERS_TS_US = "FTXUS-TS"
+HEADERS_SUBACCOUNT_US = "FTXUS-SUBACCOUNT"
+
 
 class BaseClient:
-    API_URL = "https://ftx.com/api"
+    API_URL = "https://ftx.{}/api"
 
-    def __init__(self, api: Optional[str] = None, secret: Optional[str] = None):
+    def __init__(self, api: Optional[str] = None, secret: Optional[str] = None, tld: str = 'com'):
         self.API_KEY, self.API_SECRET = api, secret
         self.session = self._init_session()
         self.header = {}
         self.TIMEOUT = 45
+        self.API_URL = self.API_URL.format(tld)
 
     def _get_header(self) -> Dict:
         header = {
-            "FTX-KEY": "",
-            "FTX-SIGN": "",
-            "FTX-TS": "",
+            self.HEADERS_KEY: "",
+            self.HEADERS_SIGN: "",
+            self.HEADERS_TS: "",
         }
         if self.API_KEY:
             assert self.API_KEY
-            header["FTX-KEY"] = self.API_KEY
+            header[self.HEADERS_KEY] = self.API_KEY
         return header
 
     def _init_session(self):
         raise NotImplementedError
-
-    def _init_url(self):
-        self.api_url = self.API_URL
 
     def _handle_response(self, response: requests.Response):
         code = response.status_code
@@ -60,9 +68,23 @@ class BaseClient:
 
 
 class Client(BaseClient):
-    def __init__(self, api: Optional[str], secret: Optional[str], subaccount=None):
-        super().__init__(api=api, secret=secret)
+    def __init__(self, api: Optional[str], secret: Optional[str], subaccount=None, tld: str = 'com'):
         self.subaccount = subaccount
+        self.tld = tld
+        self.HEADERS_KEY = HEADERS_KEY
+        self.HEADERS_SIGN = HEADERS_SIGN
+        self.HEADERS_TS = HEADERS_TS
+        self.HEADERS_SUBACCOUNT = HEADERS_SUBACCOUNT
+        if self.tld == "us":
+            self.HEADERS_KEY = HEADERS_KEY_US
+            self.HEADERS_SIGN = HEADERS_SIGN_US
+            self.HEADERS_TS = HEADERS_TS_US
+            self.HEADERS_SUBACCOUNT = HEADERS_SUBACCOUNT_US
+        super().__init__(
+            api=api,
+            secret=secret,
+            tld=tld
+        )
 
     def _init_session(self) -> requests.Session:
         self.header = self._get_header()
@@ -95,11 +117,11 @@ class Client(BaseClient):
         if prepared.body:
             signature_payload += prepared.body
         signature = hmac.new(self.API_SECRET.encode(), signature_payload, 'sha256').hexdigest()
-        request.headers['FTX-KEY'] = self.API_KEY
-        request.headers['FTX-SIGN'] = signature
-        request.headers['FTX-TS'] = str(ts)
+        request.headers[self.HEADERS_KEY] = self.API_KEY
+        request.headers[self.HEADERS_SIGN] = signature
+        request.headers[self.HEADERS_TS] = str(ts)
         if self.subaccount is not None:
-            request.headers['FTX-SUBACCOUNT'] = urllib.parse.quote(self.subaccount)
+            request.headers[self.HEADERS_SUBACCOUNT] = urllib.parse.quote(self.subaccount)
 
     """ Orders Zone"""
 
@@ -112,9 +134,9 @@ class Client(BaseClient):
     def get_conditional_orders(self, **kwargs) -> Dict:
         return self._get(ENDPOINT_ORDERS_TRIGGER, params=kwargs)
 
-    def get_conditional_orders_triggers(self, **kwargs) -> Dict:
+    def get_conditional_orders_triggers(self, conditional_order_id) -> Dict:
         ftx_endpoint = f"{ENDPOINT_ORDERS_TRIGGER}/{conditional_order_id}/triggers"
-        return self._get(ftx_endpoint, params=kwargs)
+        return self._get(ftx_endpoint)
 
     def get_conditional_order_history(self, **kwargs) -> Dict:
         return self._get(ENDPOINT_ORDERS_TRIGGER_HISTORY, params=kwargs)
@@ -202,8 +224,7 @@ class Client(BaseClient):
         return self._get("/markets")
 
     def get_klines(self, market: str, resolution: int, start_time=None, end_time=None) -> Dict:
-        params = {}
-        params["resolution"] = resolution
+        params = {"resolution": resolution}
         if start_time is not None:
             params["start_time"] = start_time
         if end_time is not None:
@@ -261,13 +282,25 @@ class AsyncClient(BaseClient):
             api: Optional[str],
             secret: Optional[str],
             subaccount=None,
-            loop=None,
+            tld: str = 'com',
+            loop=None
     ):
         self.loop = loop or asyncio.get_event_loop()
         self.subaccount = subaccount
+        self.tld = tld
+        self.HEADERS_KEY = HEADERS_KEY
+        self.HEADERS_SIGN = HEADERS_SIGN
+        self.HEADERS_TS = HEADERS_TS
+        self.HEADERS_SUBACCOUNT = HEADERS_SUBACCOUNT
+        if self.tld == "us":
+            self.HEADERS_KEY = HEADERS_KEY_US
+            self.HEADERS_SIGN = HEADERS_SIGN_US
+            self.HEADERS_TS = HEADERS_TS_US
+            self.HEADERS_SUBACCOUNT = HEADERS_SUBACCOUNT_US
         super().__init__(
             api=api,
             secret=secret,
+            tld=tld
         )
 
     @classmethod
@@ -291,7 +324,7 @@ class AsyncClient(BaseClient):
 
     async def _request(self, method: str, path: str, **kwargs) -> Any:
         request = Request(method, self.API_URL + path, **kwargs)
-        await  self._sign_request(request)
+        await self._sign_request(request)
         self.response = self.session.send(request.prepare())
         return await self._handle_response(self.response)
 
@@ -302,11 +335,11 @@ class AsyncClient(BaseClient):
         if prepared.body:
             signature_payload += prepared.body
         signature = hmac.new(self.API_SECRET.encode(), signature_payload, 'sha256').hexdigest()
-        request.headers['FTX-KEY'] = self.API_KEY
-        request.headers['FTX-SIGN'] = signature
-        request.headers['FTX-TS'] = str(ts)
+        request.headers[self.HEADERS_KEY] = self.API_KEY
+        request.headers[self.HEADERS_SIGN] = signature
+        request.headers[self.HEADERS_TS] = str(ts)
         if self.subaccount is not None:
-            request.headers['FTX-SUBACCOUNT'] = urllib.parse.quote(self.subaccount)
+            request.headers[self.HEADERS_SUBACCOUNT] = urllib.parse.quote(self.subaccount)
 
     async def _handle_response(self, response: requests.Response):
         code = response.status_code

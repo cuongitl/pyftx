@@ -22,3 +22,6 @@
 * Version 0.0.4 - 29 May 2022 fixed bug
 * Version 0.0.5 - 31 May 2022
   * Add a lot of endpoint from ftx's documents
+* Version 0.0.6 - 05 June 2022
+  * Add debug to websockets stream
+  * Support FTX.US
