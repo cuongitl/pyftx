@@ -11,7 +11,7 @@
 [FTX](https://ftx.com/referrals#a=121465957) is a cryptocurrency derivatives exchange.
 
 This is a wrapper around the FTX API as described on [FTX](https://docs.ftx.com/), including all features the API provides using clear and readable objects, both for the REST  as the websocket API.
-> An unofficial Python3 library to interact with [FTX.COM](https://ftx.com/) and [FTX.US](https://ftx.us).
+> An unofficial Python3 library to interact with `FTX.COM` and `FTX.US`
  
 I am in no way affiliated with FTX, use at your own risk.
 
@@ -126,3 +126,7 @@ I develop and maintain this package on my own for free in my spare time. Donatio
 ## Release Notes
 The release notes can be found
 [here.](https://gitlab.com/cuongitl/python-ftx-api/-/blob/main/release_notes.md)
+
+## Contribution
+* Fork this repository.
+* Make pull requests with proper commit message.

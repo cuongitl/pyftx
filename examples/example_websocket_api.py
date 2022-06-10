@@ -1,6 +1,7 @@
 from pyftx import ThreadedWebsocketManager
 from functools import partial
 
+
 def on_message(event, argument):
     msg = "{}.event: {}".format(argument, event)
     print("on message: ", msg)
